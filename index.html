@@ -90,15 +90,31 @@ input[type=search]{flex:1 1 0;width:0;min-width:0;font:inherit;font-size:15px;pa
 .hc.pk2{outline:2px solid var(--gold)}
 .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .roll{display:inline-block;animation:roll .6s cubic-bezier(.2,.9,.2,1);font-size:26px;color:var(--gold)}
+.views{display:flex;gap:6px;margin:6px 2px 10px;padding:4px;border:1.5px solid var(--line);border-radius:99px}
+.views button{flex:1;border:0;background:none;color:var(--mute);font-weight:800;font-size:14px;padding:10px;border-radius:99px}
+.views button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+.hero{display:flex;align-items:center;gap:16px;margin:12px 0 6px}.hero>div:last-child{min-width:0;color:var(--mute);font-size:13px;line-height:1.5}.hero b{color:var(--ink)}
+.ring{--v:0;width:104px;height:104px;border-radius:50%;background:conic-gradient(var(--h) calc(var(--v)*1%),var(--line) 0);display:grid;place-items:center;flex:none;position:relative}
+.ring::before{content:"";position:absolute;inset:9px;border-radius:50%;background:var(--bg)}
+.ring b{position:relative;font-weight:900;font-size:32px}
+.dots{display:flex;gap:5px;flex-wrap:wrap}.dot{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:800;color:#06101a}.dot.y{background:var(--h)}.dot.n{background:var(--a)}
+.tb{display:grid;gap:8px;font-size:13px}.tr{display:grid;grid-template-columns:1.3fr .5fr .8fr .8fr;gap:6px;align-items:center;color:var(--mute)}.tr>*{min-width:0}.tr b{color:var(--ink)}.tr.hd{font-size:11px}
+.hrow{display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}.hrow:last-child{border:0}
+.hrow .dot{flex:none}.hrow .tx{min-width:0;flex:1;overflow-wrap:anywhere}.hrow small{display:block;color:var(--mute);font-size:12px}
+.pick3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.pick3 button{border:1.5px solid var(--line);background:none;border-radius:10px;padding:10px 4px;font-weight:700;font-size:13px;min-width:0;overflow-wrap:anywhere}.pick3 button[aria-pressed=true]{background:var(--gold);color:#1a1405;border-color:var(--gold)}
 </style>
 </head>
 <body>
 <main>
 <header><div><p>Прогнози на найближчі дні</p><h1 class="disp">МАТЧДЕЙ</h1></div><button class="btn" id="gear">Ключі API</button></header>
 <div class="bar"><span id="bar">Завантаження…</span><button class="btn" id="rf">Оновити</button></div>
+<div class="views" id="vw" role="group" aria-label="Розділ"><button data-v="m" aria-pressed="true">Матчі</button><button data-v="s" aria-pressed="false">Статистика</button></div>
+<div id="mv">
 <div class="ctl"><input type="search" id="q" placeholder="Пошук команди" aria-label="Пошук команди"><div class="seg" id="so" role="group" aria-label="Сортування"><button data-s="t" aria-pressed="true">Час</button><button data-s="c" aria-pressed="false">Впевн.</button><button data-s="g" aria-pressed="false">Голи</button></div></div>
 <div class="tabs" id="tabs" role="group" aria-label="Турніри"></div>
 <div id="list"></div>
+</div>
+<div id="sv2" hidden></div>
 <p class="note">Прогноз поєднує ринкові коефіцієнти, статистику команд (ESPN) і дані API-Football. Це аналітика, а не гарантія результату.</p>
 </main>
 <div id="sh" role="dialog" aria-modal="true"><div class="in" id="det"></div></div>
