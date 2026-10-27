@@ -6,7 +6,7 @@ var S={k:{o:"",a:""},on:[1,1,1,1,1,1,1]};
 try{var s0=JSON.parse(localStorage.getItem("md_s"));if(s0&&s0.k&&s0.on&&s0.on.length===7){S=s0;S.k.o=S.k.o||"";S.k.a=S.k.a||""}}catch(e){}
 try{FV=JSON.parse(localStorage.getItem("md_fv"))||{}}catch(e){}
 /* ---------- історія прогнозів ---------- */
-var HS=[],V="m",HE="";
+var HS=[],V="m",HE="",FM={};
 try{HS=JSON.parse(localStorage.getItem("md_hist"))||[]}catch(e){}
 function hsv(){try{localStorage.setItem("md_hist",JSON.stringify(HS))}catch(e){}}
 function hfind(m){var t=m.t.getTime(),k=nm(m.H)+"|"+nm(m.A);return HS.filter(function(x){return nm(x.H)+"|"+nm(x.A)===k&&Math.abs(new Date(x.t)-t)<4*864e5})[0]}
@@ -114,6 +114,29 @@ async function loadESPN(){
    T[k]={att:(t.gf/avg+6)/(t.gp+6),def:(t.ga/avg+6)/(t.gp+6),g:avg,c:i<2?"E":i,gp:t.gp,gf:t.gf,ga:t.ga}})});
  ST=T;L=lg;X=fx;if(Object.keys(T).length||fx.length)cs("md_es2",{T:T,L:lg,X:fx})}
 
+/* ---------- форма: останні 5 матчів (ESPN) ---------- */
+async function loadForm(){var c=cg("md_fm1",216e5);if(c){FM=c;return}
+ var ev={},ids=[],day=864e5,now=Date.now(),ch=[[42,28],[27,14],[13,0]],f8=function(t){return new Date(t).toISOString().slice(0,10).replace(/-/g,"")},bad=0,tot=0;
+ LG.forEach(function(l,i){if(S.on[i])ids.push(i)});
+ await Promise.all(ids.map(function(i){return Promise.all(ch.map(async function(r){tot++;
+  try{(await sb(LG[i][3],f8(now-r[0]*day)+"-"+f8(now-r[1]*day))).forEach(function(e){var c=e.competitions&&e.competitions[0];if(!c||!(e.status&&e.status.type&&e.status.type.completed))return;
+   var cp=c.competitors,s=cp.map(function(x){return parseInt(x.score,10)});if(cp.length!==2||isNaN(s[0])||isNaN(s[1]))return;
+   cp.forEach(function(x,k){var key=nm(x.team.displayName);(ev[key]=ev[key]||{})[e.id]={t:e.date,gf:s[k],ga:s[1-k]}})})}catch(e){bad++}}))}));
+ var F2={};Object.keys(ev).forEach(function(k){var a=Object.keys(ev[k]).map(function(id){return ev[k][id]}).sort(function(x,y){return new Date(x.t)-new Date(y.t)}).slice(-5);
+  F2[k]={n:a.length,gf:a.reduce(function(s,x){return s+x.gf},0),ga:a.reduce(function(s,x){return s+x.ga},0),r:a.map(function(x){return x.gf>x.ga?"W":x.gf===x.ga?"D":"L"})}});
+ FM=F2;if(bad&&bad===tot)msgs.push("ESPN форма команд: недоступна");if(Object.keys(F2).length)cs("md_fm1",F2)}
+function ef(t,f){if(!f||f.n<2)return[t.att,t.def];return[.75*t.att+.25*(f.gf/t.g+3)/(f.n+3),.75*t.def+.25*(f.ga/t.g+3)/(f.n+3)]}
+
+/* ---------- нагадування: файл календаря (.ics) ---------- */
+function icsEsc(x){return String(x).replace(/[\\;,]/g,function(c){return"\\"+c}).replace(/\n/g,"\\n")}
+function icsDt(d){return d.toISOString().replace(/[-:]/g,"").replace(/\.\d+/,"")}
+function icsDl(list){var L=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Matchday//UK","CALSCALE:GREGORIAN"];
+ list.forEach(function(m){var k=view(m,0,0).k;
+  L.push("BEGIN:VEVENT","UID:"+nm(m.H).replace(/ /g,"")+nm(m.A).replace(/ /g,"")+m.t.getTime()+"@matchday","DTSTAMP:"+icsDt(new Date()),"DTSTART:"+icsDt(m.t),"DURATION:PT2H",
+   "SUMMARY:"+icsEsc("⚽ "+m.H+" — "+m.A),"DESCRIPTION:"+icsEsc(LG[m.lg][0]+". Прогноз "+k.s[1]+":"+k.s[2]+", "+k.txt+" ("+pc(k.p)+"%)"),
+   "BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:"+icsEsc(m.H+" — "+m.A+" за годину"),"TRIGGER:-PT60M","END:VALARM","END:VEVENT")});
+ L.push("END:VCALENDAR");var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([L.join("\r\n")],{type:"text/calendar;charset=utf-8"}));a.download="matchday.ics";document.body.appendChild(a);a.click();a.remove()}
+
 /* ---------- The Odds API ---------- */
 async function loadOdds(force){
  var c=!force&&cg("md_od",108e5);if(c)return c;
@@ -150,9 +173,10 @@ async function loadAF(m){
  }catch(e){m.af=null;m.afs="API-Football: "+ferr(e)}}
 
 /* ---------- модель ---------- */
-function recalc(m){var sg=[];
+function recalc(m){var sg=[];m.dv=null;
+ if(m.mk&&m.st){var bi=0,i;for(i=1;i<3;i++)if(Math.abs(m.st.p[i]-m.mk[i])>Math.abs(m.st.p[bi]-m.mk[bi]))bi=i;m.dv={i:bi,d:m.st.p[bi]-m.mk[bi]}}
  if(m.mk)sg.push(["Ринок (коефіцієнти)",m.mk,.6]);
- if(m.st)sg.push(["Статистика ліги (ESPN)",m.st.p,m.st.w]);
+ if(m.st)sg.push(["Статистика та форма (ESPN)",m.st.p,m.st.w]);
  if(m.af&&m.af.p)sg.push(["API-Football",m.af.p,.2]);
  var tw=0,f=[0,0,0];sg.forEach(function(s){tw+=s[2];for(var i=0;i<3;i++)f[i]+=s[1][i]*s[2]});
  f=f.map(function(x){return x/tw});m.sg=sg;m.tw=tw;m.fin=f;var l=fit(f);m.l0=l[0];m.l1=l[1]}
@@ -161,15 +185,16 @@ function view(m,x,y){var f=m.af&&m.af.inj||[0,0],lh=m.l0*(1+.07*x)*Math.max(.8,1
 async function refresh(force){
  $("bar").textContent="Оновлюю дані…";msgs=[];
  try{
-  if(force)try{localStorage.removeItem("md_es2")}catch(e){}
+  if(force)try{localStorage.removeItem("md_es2");localStorage.removeItem("md_fm1")}catch(e){}
   await loadESPN();
+  try{await loadForm()}catch(e){msgs.push("ESPN форма команд: "+ferr(e))}
   var o={m:[],rem:"—",errs:[]};
   if(S.k.o){try{o=await loadOdds(force);msgs=msgs.concat(o.errs)}catch(e){msgs.push("The Odds API: "+ferr(e))}}
   var all=o.m.slice(),lim=Date.now()-72e5;
   X.forEach(function(f){if(!all.some(function(m){return m.lg===f.lg&&same(m.H,f.H)&&same(m.A,f.A)}))all.push({id:"e"+f.lg+nm(f.H)+f.t.slice(0,10),lg:f.lg,t:f.t,H:f.H,A:f.A,mk:null})});
   D=all.filter(function(g){return S.on[g.lg]}).map(function(g){var m={id:g.id,lg:g.lg,t:new Date(g.t),H:g.H,A:g.A,mk:g.mk};
     var a=find(ST,m.H),b=find(ST,m.A);
-    if(a&&b){var r=calc(a.g*a.att*b.def*1.1,b.g*b.att*a.def*.92);m.st={p:[r.h,r.d,r.a],w:a.c===b.c?.25:.1,x:[a,b]}}
+    if(a&&b){var fa=find(FM,m.H),fb=find(FM,m.A),ea=ef(a,fa),eb=ef(b,fb),r=calc(a.g*ea[0]*eb[1]*1.1,b.g*eb[0]*ea[1]*.92);m.st={p:[r.h,r.d,r.a],w:a.c===b.c?.25:.1,x:[a,b]};m.fm=[fa&&fa.n>=2?fa:null,fb&&fb.n>=2?fb:null]}
     if(!m.mk&&!m.st)return null;
     m.af=cg("md_af"+m.id,216e5)||undefined;recalc(m);return m})
    .filter(function(m){return m&&m.t.getTime()>lim}).sort(function(a,b){return a.t-b.t});
@@ -189,19 +214,20 @@ function hm(d){return d.toLocaleTimeString("uk-UA",{hour:"2-digit",minute:"2-dig
 function fk(m){return m.H+"|"+m.A}
 function dlabel(d){var n=new Date(),df=Math.round((new Date(d.getFullYear(),d.getMonth(),d.getDate())-new Date(n.getFullYear(),n.getMonth(),n.getDate()))/864e5),s=d.toLocaleDateString("uk-UA",{weekday:"long",day:"numeric",month:"long"});
  return df===0?["Сьогодні",s]:df===1?["Завтра",s]:[s.charAt(0).toUpperCase()+s.slice(1),""]}
-function tabs(){var h='<button class="tab" aria-pressed="'+(F===-1)+'" data-f="-1">Усі</button><button class="tab" aria-pressed="'+(F===-2)+'" data-f="-2">★ Обрані</button>';
+function tabs(){var h='<button class="tab" aria-pressed="'+(F===-1)+'" data-f="-1">Усі</button><button class="tab" aria-pressed="'+(F===-2)+'" data-f="-2">★ Обрані</button><button class="tab" aria-pressed="'+(F===-3)+'" data-f="-3">⚡ Розбіжності</button>';
  LG.forEach(function(l,i){if(S.on[i])h+='<button class="tab" aria-pressed="'+(F===i)+'" data-f="'+i+'">'+li(i)+l[0]+"</button>"});$("tabs").innerHTML=h}
 function card(x){var v=x.v,r=v.r,fav=!!FV[fk(x)];
  return'<div class="m" role="button" tabindex="0" style="--c:'+LG[x.lg][1]+'" data-i="'+D.indexOf(x)+'"><div class="top"><i>'+li(x.lg)+LG[x.lg][0]+"</i><span>"+(x.mk?"":"лише статистика · ")+(SO==="t"?"":dlabel(x.t)[0]+", ")+hm(x.t)+'<button class="st" data-k="'+esc(fk(x))+'" aria-pressed="'+fav+'" aria-label="В обрані">★</button></span></div>'+
  '<div class="tt"><div class="t">'+bd(x.H)+"<span>"+esc(x.H)+'</span></div><div class="sc disp">'+v.k.s[1]+":"+v.k.s[2]+'</div><div class="t r">'+bd(x.A)+"<span>"+esc(x.A)+"</span></div></div>"+
  '<div class="rb"><b class="h" style="flex:'+r.h+'"></b><b class="d" style="flex:'+r.d+'"></b><b class="a" style="flex:'+r.a+'"></b></div>'+
- '<div class="pk"><b>'+esc(v.k.txt)+"</b> · "+pc(v.k.p)+"%</div></div>"}
-function list(){var q=Q.trim().toLowerCase(),L2=D.filter(function(x){return(F===-1||(F===-2?FV[fk(x)]:x.lg===F))&&(!q||(x.H+" "+x.A).toLowerCase().indexOf(q)>=0)});
+ '<div class="pk"><b>'+esc(v.k.txt)+"</b> · "+pc(v.k.p)+"%"+(x.dv&&Math.abs(x.dv.d)>=.1?'<span class="dvb">⚡ '+(x.dv.d>0?"+":"−")+Math.round(Math.abs(x.dv.d)*100)+" п.п. до ринку</span>":"")+"</div></div>"}
+function list(){var q=Q.trim().toLowerCase(),L2=D.filter(function(x){return(F===-1||(F===-2?FV[fk(x)]:F===-3?(x.dv&&Math.abs(x.dv.d)>=.1):x.lg===F))&&(!q||(x.H+" "+x.A).toLowerCase().indexOf(q)>=0)});
  L2.forEach(function(x){x.v=view(x,0,0)});
- if(!L2.length){$("list").innerHTML='<p class="empty">'+(F===-2?"Позначте матчі зірочкою ★, і вони з’являться тут.":q?"Нічого не знайдено.":"Матчів не знайдено. Спробуйте «Оновити» або перевірте повідомлення про помилки вище.")+"</p>";return}
+ if(!L2.length){$("list").innerHTML='<p class="empty">'+(F===-2?"Позначте матчі зірочкою ★, і вони з’являться тут.":F===-3?"Зараз немає матчів, де статистика розходиться з ринком більш ніж на 10 п.п. Для цієї вкладки потрібен ключ The Odds API.":q?"Нічого не знайдено.":"Матчів не знайдено. Спробуйте «Оновити» або перевірте повідомлення про помилки вище.")+"</p>";return}
  var h="";
  if(SO==="t"){var cd="";L2.forEach(function(x){var k=x.t.toDateString();if(k!==cd){cd=k;var d=dlabel(x.t);h+='<div class="day">'+d[0]+(d[1]?"<span>"+d[1]+"</span>":"")+"</div>"}h+=card(x)})}
  else{L2.slice().sort(function(a,b){return SO==="c"?b.v.k.p-a.v.k.p:(b.v.lh+b.v.la)-(a.v.lh+a.v.la)}).forEach(function(x){h+=card(x)})}
+ if(F===-2){var up2=L2.filter(function(x){return x.t.getTime()>Date.now()}).length;if(up2)h='<div class="acts" style="margin:8px 2px"><button class="btn gold" id="favcal">Нагадування в календар ('+up2+")</button></div>"+h}
  $("list").innerHTML=h}
 function sheet(h){$("det").innerHTML=h;$("sh").classList.add("on");$("sh").scrollTop=0}
 function close(){$("sh").classList.remove("on");cur=null}
@@ -219,21 +245,25 @@ function upd(anim){var m=cur;if(!m)return;var v=view(m,ah,aa),r=v.r,k=v.k,an=ani
  '<div class="tiles"><div class="tile"><b class="disp">'+(v.lh+v.la).toFixed(1)+'</b><span>очікувані голи</span></div><div class="tile"><b class="disp">'+pc(r.o)+'%</b><span>тотал більше 2,5</span></div><div class="tile"><b class="disp">'+pc(r.b)+"%</b><span>обидві заб’ють</span></div></div>"+
  '<h3>Найімовірніші рахунки</h3><div class="chips">'+tp.map(function(x){return'<span class="chip"><b class="disp">'+x[1]+":"+x[2]+"</b>"+(x[0]*100).toFixed(1)+"%</span>"}).join("")+"</div>"+
  '<h3>Карта рахунків (торкніться клітинки)</h3><div class="hmx">'+cells+'</div><p class="note" id="hi" style="margin-top:8px">Рядки: голи господарів, стовпці: голи гостей.</p>'+
- '<div class="acts"><button class="btn gold" id="sim1">Зіграти матч</button><button class="btn" id="sim100">Зіграти 100 разів</button><button class="btn" id="shr">Поділитися</button></div><p class="note" id="sr"></p>'}
-function draw(anim){var m=cur;if(!m)return;var a=m.af,e0=hfind(m),up=e0&&m.t.getTime()>Date.now()?'<h3>Ваш прогноз</h3><div class="pick3">'+[m.H,"Нічия",m.A].map(function(t,i){return'<button data-u="'+i+'" aria-pressed="'+(e0.u===i)+'">'+esc(t)+"</button>"}).join("")+'</div><p class="note">Ваші вгадування порівняються з моделлю у вкладці «Статистика».</p>':"";
+ '<div class="acts"><button class="btn gold" id="sim1">Зіграти матч</button><button class="btn" id="sim100">Зіграти 100 разів</button><button class="btn" id="shr">Поділитися</button>'+(m.t.getTime()>Date.now()?'<button class="btn" id="cal">У календар</button>':"")+'</div><p class="note" id="sr"></p>'}
+function draw(anim){var m=cur;if(!m)return;var a=m.af,e0=hfind(m),up=e0&&m.t.getTime()>Date.now()?'<h3>Ваш прогноз</h3><div class="pick3">'+[m.H,"Нічия",m.A].map(function(t,i){return'<button data-u="'+i+'" aria-pressed="'+(e0.u===i)+'">'+esc(t)+"</button>"}).join("")+'</div><p class="note">Ваші вгадування порівняються з моделлю у вкладці «Статистика».</p>':"",nmx=["Перемога: "+m.H,"Нічия","Перемога: "+m.A],dvh="",fmh="";
+ if(m.dv){dvh='<h3>Модель проти ринку</h3><div class="box"><div class="tb"><div class="tr hd"><span>Результат</span><span>Різн.</span><span>Ринок</span><span>Статистика</span></div>'+[0,1,2].map(function(i){var d=m.st.p[i]-m.mk[i],b=i===m.dv.i&&Math.abs(d)>=.1;return'<div class="tr"><'+(b?"b":"span")+">"+esc(nmx[i])+"</"+(b?"b":"span")+"><span>"+(d>0?"+":d<0?"−":"")+Math.round(Math.abs(d)*100)+'</span><span>'+pc(m.mk[i])+"%</span><span>"+pc(m.st.p[i])+"%</span></div>"}).join("")+"</div><div>"+(Math.abs(m.dv.d)>=.1?"Найбільша розбіжність: <b>"+esc(nmx[m.dv.i])+"</b>. ":"Ринок і статистика майже збігаються. ")+"Ринок знає про склад, травми й мотивацію, чого не бачить статистика, тому розбіжність — привід перевірити новини, а не готовий сигнал.</div></div>"}
+ if(m.fm&&(m.fm[0]||m.fm[1])){var fl=function(n,f){if(!f)return"<div><b>"+esc(n)+"</b><small> немає даних</small></div>";return'<div class="fm"><b>'+esc(n)+'</b><div class="dots">'+f.r.map(function(z){return'<span class="dot '+(z==="W"?"y":z==="L"?"n":"d")+'">'+(z==="W"?"П":z==="L"?"Пр":"Н")+"</span>"}).join("")+"<small>голи "+f.gf+":"+f.ga+"</small></div></div>"};
+  fmh='<h3>Форма: останні матчі</h3><div class="box">'+fl(m.H,m.fm[0])+fl(m.A,m.fm[1])+'<div>П — перемога, Н — нічия, Пр — поразка (від старіших до новіших). Форма враховується в статистичній частині прогнозу з вагою 25%.</div></div>'}
  var rows=m.sg.map(function(s){return'<div class="row"><b>'+s[0]+"</b><span>"+pc(s[2]/m.tw)+"%</span><span>"+s[1].map(function(x){return pc(x)}).join(" / ")+"</span></div>"}).join("");
  var st=m.st?"Голів за гру (забиті/пропущені): "+esc(m.H)+" "+(m.st.x[0].gf/m.st.x[0].gp).toFixed(2)+"/"+(m.st.x[0].ga/m.st.x[0].gp).toFixed(2)+", "+esc(m.A)+" "+(m.st.x[1].gf/m.st.x[1].gp).toFixed(2)+"/"+(m.st.x[1].ga/m.st.x[1].gp).toFixed(2):"Статистику не знайдено для однієї з команд.";
  var af=!S.k.a?"Додайте ключ API-Football, щоб бачити прогноз сервісу й травми.":a?(a.adv?"Порада сервісу: <b>"+esc(a.adv)+"</b><br>":"")+"Травми: "+esc(m.H)+" — "+(a.inj[0]?a.names[0].map(esc).join(", "):"немає даних")+"; "+esc(m.A)+" — "+(a.inj[1]?a.names[1].map(esc).join(", "):"немає даних"):esc(m.afs||"Завантаження…");
  sheet('<button class="btn" id="cl">Закрити</button><div class="meta" style="--c:'+LG[m.lg][1]+'"><i>'+li(m.lg)+LG[m.lg][0]+"</i> · "+dlabel(m.t)[0]+", "+hm(m.t)+"</div>"+
  '<div class="vs"><div class="t">'+bd(m.H)+"<span>"+esc(m.H)+'</span></div><div class="t">'+bd(m.A)+"<span>"+esc(m.A)+"</span></div></div><div id=\"dyn\"></div>"+
  '<h3>З яких джерел зібрано прогноз</h3><div class="box">'+rows+"<div>"+st+"</div><div>"+af+"</div></div>"+
- up+'<h3>Ваші поправки до складу</h3><div class="box"><label>'+esc(m.H)+": <b id=\"la\">"+sl(ah)+'</b><input type="range" id="sa" min="-2" max="2" value="'+ah+'"></label><label>'+esc(m.A)+": <b id=\"lb\">"+sl(aa)+'</b><input type="range" id="sb" min="-2" max="2" value="'+aa+'"></label></div>'+
+ dvh+fmh+up+'<h3>Ваші поправки до складу</h3><div class="box"><label>'+esc(m.H)+": <b id=\"la\">"+sl(ah)+'</b><input type="range" id="sa" min="-2" max="2" value="'+ah+'"></label><label>'+esc(m.A)+": <b id=\"lb\">"+sl(aa)+'</b><input type="range" id="sb" min="-2" max="2" value="'+aa+'"></label></div>'+
  '<p class="note">Ймовірності джерел: перемога господарів / нічия / перемога гостей. Модель Пуассона перетворює підсумок на очікувані голи, рахунок і тотали. Кожен «втрачений» гравець з API-Football знижує очікувані голи на 3%, повзунок змінює їх на 7% за крок.</p>');
  upd(anim)}
 function samp(r){var u=Math.random(),s=0,i;for(i=0;i<r.g.length;i++){s+=r.g[i][0];if(u<=s)return r.g[i]}return r.g[0]}
 $("det").onclick=function(e){var t=e.target,m=cur;if(t.closest("#cl")){close();return}if(!m)return;
  var ub=t.closest("[data-u]");if(ub){var e1=hfind(m),i=+ub.dataset.u;if(!e1||m.t.getTime()<=Date.now())return;if(e1.u===i)delete e1.u;else e1.u=i;hsv();Array.prototype.forEach.call(ub.parentNode.children,function(b){b.setAttribute("aria-pressed",+b.dataset.u===e1.u)});return}
  var hc=t.closest(".hc");if(hc){var c=m.vr.r.g[+hc.dataset.i*N+ +hc.dataset.j];$("hi").innerHTML="Рахунок <b>"+c[1]+":"+c[2]+"</b>: "+(c[0]*100).toFixed(1)+"% (приблизно 1 шанс із "+Math.round(1/c[0])+")";return}
+ if(t.closest("#cal")){icsDl([m]);return}
  if(t.closest("#sim1")){var s=samp(m.vr.r);$("sr").innerHTML='Симуляція: <b class="disp roll">'+s[1]+":"+s[2]+"</b>";return}
  if(t.closest("#sim100")){var w=[0,0,0],gh=0,ga=0,k;for(k=0;k<100;k++){var z=samp(m.vr.r);w[z[1]>z[2]?0:z[1]===z[2]?1:2]++;gh+=z[1];ga+=z[2]}
   $("sr").innerHTML="100 матчів: перемог господарів <b>"+w[0]+"</b>, нічиїх <b>"+w[1]+"</b>, перемог гостей <b>"+w[2]+"</b>. Середній рахунок "+(gh/100).toFixed(1)+" : "+(ga/100).toFixed(1)+".";return}
@@ -250,10 +280,10 @@ function settings(){cur=null;
  '<p style="margin-top:18px"><button class="btn gold" id="sv">Зберегти й оновити</button></p>'+
  '<p class="note">Ключі: <a href="https://the-odds-api.com" target="_blank" rel="noopener">the-odds-api.com</a>, <a href="https://dashboard.api-football.com/register" target="_blank" rel="noopener">api-football.com</a>. Є безкоштовні плани.</p>');
  $("sv").onclick=function(){S.k={o:$("ko").value.trim(),a:$("ka").value.trim()};S.on=LG.map(function(l,i){return $("lg"+i).checked?1:0});
-  if(F>=0&&!S.on[F])F=-1;sv();try{localStorage.removeItem("md_es2");localStorage.removeItem("md_od")}catch(e){}close();refresh(false)}}
+  if(F>=0&&!S.on[F])F=-1;sv();try{localStorage.removeItem("md_es2");localStorage.removeItem("md_fm1");localStorage.removeItem("md_od")}catch(e){}close();refresh(false)}}
 
 $("tabs").onclick=function(e){var b=e.target.closest(".tab");if(!b)return;F=+b.dataset.f;tabs();list()};
-$("list").onclick=function(e){var s=e.target.closest(".st");
+$("list").onclick=function(e){if(e.target.closest("#favcal")){icsDl(D.filter(function(x){return FV[fk(x)]&&x.t.getTime()>Date.now()}));return}var s=e.target.closest(".st");
  if(s){var k=s.dataset.k;if(FV[k])delete FV[k];else FV[k]=1;try{localStorage.setItem("md_fv",JSON.stringify(FV))}catch(x){}if(F===-2)list();else s.setAttribute("aria-pressed",!!FV[k]);return}
  var b=e.target.closest(".m");if(b)open(+b.dataset.i)};
 $("list").onkeydown=function(e){if((e.key==="Enter"||e.key===" ")&&e.target.classList.contains("m")){e.preventDefault();open(+e.target.dataset.i)}};

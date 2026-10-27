@@ -97,11 +97,13 @@ input[type=search]{flex:1 1 0;width:0;min-width:0;font:inherit;font-size:15px;pa
 .ring{--v:0;width:104px;height:104px;border-radius:50%;background:conic-gradient(var(--h) calc(var(--v)*1%),var(--line) 0);display:grid;place-items:center;flex:none;position:relative}
 .ring::before{content:"";position:absolute;inset:9px;border-radius:50%;background:var(--bg)}
 .ring b{position:relative;font-weight:900;font-size:32px}
-.dots{display:flex;gap:5px;flex-wrap:wrap}.dot{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:800;color:#06101a}.dot.y{background:var(--h)}.dot.n{background:var(--a)}
+.dots{display:flex;gap:5px;flex-wrap:wrap}.dot{min-width:22px;height:22px;padding:0 5px;border-radius:99px;display:grid;place-items:center;font-size:12px;font-weight:800;color:#06101a}.dot.y{background:var(--h)}.dot.n{background:var(--a)}
 .tb{display:grid;gap:8px;font-size:13px}.tr{display:grid;grid-template-columns:1.3fr .5fr .8fr .8fr;gap:6px;align-items:center;color:var(--mute)}.tr>*{min-width:0}.tr b{color:var(--ink)}.tr.hd{font-size:11px}
 .hrow{display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}.hrow:last-child{border:0}
 .hrow .dot{flex:none}.hrow .tx{min-width:0;flex:1;overflow-wrap:anywhere}.hrow small{display:block;color:var(--mute);font-size:12px}
 .pick3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.pick3 button{border:1.5px solid var(--line);background:none;border-radius:10px;padding:10px 4px;font-weight:700;font-size:13px;min-width:0;overflow-wrap:anywhere}.pick3 button[aria-pressed=true]{background:var(--gold);color:#1a1405;border-color:var(--gold)}
+.dvb{color:var(--gold);font-weight:700;margin-left:6px;white-space:nowrap}.dot.d{background:var(--d);color:#fff}
+.fm{display:grid;gap:4px}.fm .dots{align-items:center}.fm small{color:var(--mute);margin-left:4px}
 </style>
 </head>
 <body>
@@ -115,7 +117,7 @@ input[type=search]{flex:1 1 0;width:0;min-width:0;font:inherit;font-size:15px;pa
 <div id="list"></div>
 </div>
 <div id="sv2" hidden></div>
-<p class="note">Прогноз поєднує ринкові коефіцієнти, статистику команд (ESPN) і дані API-Football. Це аналітика, а не гарантія результату.</p>
+<p class="note">Прогноз поєднує ринкові коефіцієнти, статистику сезону та форму команд (ESPN) і дані API-Football. Це аналітика, а не гарантія результату.</p>
 </main>
 <div id="sh" role="dialog" aria-modal="true"><div class="in" id="det"></div></div>
 <script src="app.js"></script>
