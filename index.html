@@ -104,21 +104,28 @@ input[type=search]{flex:1 1 0;width:0;min-width:0;font:inherit;font-size:15px;pa
 .pick3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.pick3 button{border:1.5px solid var(--line);background:none;border-radius:10px;padding:10px 4px;font-weight:700;font-size:13px;min-width:0;overflow-wrap:anywhere}.pick3 button[aria-pressed=true]{background:var(--gold);color:#1a1405;border-color:var(--gold)}
 .dvb{color:var(--gold);font-weight:700;margin-left:6px;white-space:nowrap}.dot.d{background:var(--d);color:#fff}
 .fm{display:grid;gap:4px}.fm .dots{align-items:center}.fm small{color:var(--mute);margin-left:4px}
+[hidden]{display:none!important}
+main{padding-bottom:calc(88px + env(safe-area-inset-bottom,0))}
+#nav{position:fixed;left:0;right:0;bottom:0;z-index:10;display:flex;background:rgba(8,12,24,.94);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom,0))}
+#nav button{flex:1;min-width:0;display:grid;justify-items:center;gap:3px;border:0;background:none;color:var(--mute);font-size:11px;font-weight:700;padding:6px 2px;border-radius:12px}
+#nav button[aria-pressed=true]{color:var(--gold)}
+.lnk{background:none;border:0;color:var(--a);font-weight:700;padding:0;font-size:12px;text-decoration:underline}
 </style>
 </head>
 <body>
 <main>
-<header><div><p>Прогнози на найближчі дні</p><h1 class="disp">МАТЧДЕЙ</h1></div><button class="btn" id="gear">Ключі API</button></header>
-<div class="bar"><span id="bar">Завантаження…</span><button class="btn" id="rf">Оновити</button></div>
-<div class="views" id="vw" role="group" aria-label="Розділ"><button data-v="m" aria-pressed="true">Матчі</button><button data-v="s" aria-pressed="false">Статистика</button></div>
+<header><div><p id="hp">Прогнози на найближчі дні</p><h1 class="disp" id="ht">МАТЧДЕЙ</h1></div><button class="btn" id="rf">Оновити</button></header>
+<div class="bar" id="barw"><span id="bar">Завантаження…</span></div>
 <div id="mv">
 <div class="ctl"><input type="search" id="q" placeholder="Пошук команди" aria-label="Пошук команди"><div class="seg" id="so" role="group" aria-label="Сортування"><button data-s="t" aria-pressed="true">Час</button><button data-s="c" aria-pressed="false">Впевн.</button><button data-s="g" aria-pressed="false">Голи</button></div></div>
 <div class="tabs" id="tabs" role="group" aria-label="Турніри"></div>
 <div id="list"></div>
 </div>
 <div id="sv2" hidden></div>
-<p class="note">Прогноз поєднує ринкові коефіцієнти, статистику сезону та форму команд (ESPN) і дані API-Football. Це аналітика, а не гарантія результату.</p>
+<div id="gv" hidden></div>
+<p class="note" id="mn">Прогноз поєднує ринкові коефіцієнти, статистику сезону та форму команд (ESPN) і дані API-Football. Це аналітика, а не гарантія результату.</p>
 </main>
+<nav id="nav" aria-label="Розділи"><button data-v="m" aria-pressed="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5l4 3-1.5 4.5h-5L8 10.5z"/></svg><span>Матчі</span></button><button data-v="f" aria-pressed="false"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z"/></svg><span>Обрані</span></button><button data-v="s" aria-pressed="false"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V11M12 20V4M19 20v-6"/></svg><span>Статистика</span></button><button data-v="g" aria-pressed="false"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>Ще</span></button></nav>
 <div id="sh" role="dialog" aria-modal="true"><div class="in" id="det"></div></div>
 <script src="app.js"></script>
 </body>
