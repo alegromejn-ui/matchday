@@ -70,15 +70,33 @@ input[type=range]{width:100%;accent-color:var(--gold)}
 .ck{display:flex;gap:8px;align-items:center;color:var(--ink)}
 a{color:var(--gold)}.note{margin-top:18px;color:var(--mute);font-size:12px;line-height:1.5}
 @media (prefers-reduced-motion:reduce){#sh{transition:none}.dg span{animation:none}}
+.m{cursor:pointer}
+.ctl{display:flex;gap:8px;align-items:center;margin:2px 0 4px}
+input[type=search]{flex:1;min-width:0;font:inherit;font-size:15px;padding:10px 14px;border-radius:99px;border:1.5px solid var(--line);background:var(--panel);color:var(--ink)}
+.seg{display:flex;border:1.5px solid var(--line);border-radius:99px;overflow:hidden;flex:none}
+.seg button{border:0;background:none;color:var(--mute);font-weight:700;font-size:12px;padding:10px 11px}
+.seg button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+.st{background:none;border:0;font-size:20px;line-height:1;color:var(--line);padding:0 0 0 8px;vertical-align:middle}
+.st[aria-pressed=true]{color:var(--gold)}
+.bd{position:relative}.bd.lg{background:#fff!important;color:transparent}
+.bd img{position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);object-fit:contain}
+.lgi{width:18px;height:18px;object-fit:contain;background:#fff;border-radius:50%;padding:2px;vertical-align:middle;margin-right:6px}
+.big div{transform-origin:left;animation:gr .8s cubic-bezier(.2,.9,.2,1)}@keyframes gr{from{transform:scaleX(0)}}
+.hmx{display:grid;grid-template-columns:auto repeat(6,1fr);gap:3px;font-size:11px;color:var(--mute);text-align:center;align-items:center}
+.hc{aspect-ratio:1;border:1px solid var(--line);border-radius:6px;background:rgba(227,192,122,var(--o));padding:0}
+.hc.pk2{outline:2px solid var(--gold)}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.roll{display:inline-block;animation:roll .6s cubic-bezier(.2,.9,.2,1);font-size:26px;color:var(--gold)}
 </style>
 </head>
 <body>
 <main>
 <header><div><p>Прогнози на найближчі дні</p><h1 class="disp">МАТЧДЕЙ</h1></div><button class="btn" id="gear">Ключі API</button></header>
 <div class="bar"><span id="bar">Завантаження…</span><button class="btn" id="rf">Оновити</button></div>
+<div class="ctl"><input type="search" id="q" placeholder="Пошук команди" aria-label="Пошук команди"><div class="seg" id="so" role="group" aria-label="Сортування"><button data-s="t" aria-pressed="true">Час</button><button data-s="c" aria-pressed="false">Впевн.</button><button data-s="g" aria-pressed="false">Голи</button></div></div>
 <div class="tabs" id="tabs" role="group" aria-label="Турніри"></div>
 <div id="list"></div>
-<p class="note">Прогноз поєднує ринкові коефіцієнти, статистику команд і дані API-Football. Це аналітика, а не гарантія результату.</p>
+<p class="note">Прогноз поєднує ринкові коефіцієнти, статистику команд (ESPN) і дані API-Football. Це аналітика, а не гарантія результату.</p>
 </main>
 <div id="sh" role="dialog" aria-modal="true"><div class="in" id="det"></div></div>
 <script src="app.js"></script>
