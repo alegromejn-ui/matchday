@@ -38,6 +38,15 @@ function same(a,b){var x=tk(a),y=tk(b),i=x.filter(function(w){return y.indexOf(w
 
 /* ---------- ESPN (без ключа): таблиці, логотипи, розклад ---------- */
 function stat(e,n){var s=(e.stats||[]).filter(function(x){return x.name===n})[0];return s?+s.value:NaN}
+/* розклад ESPN: кілька варіантів запиту, бо деякі параметри інколи дають HTTP 400 */
+async function sbGet(u){var r=await fetch(u);if(!r.ok)throw new Error("HTTP "+r.status);return(await r.json()).events||[]}
+async function sb(s,rng){var B="https://site.api.espn.com/apis/site/v2/sports/soccer/"+s+"/scoreboard",err;
+ var tries=[B+"?dates="+rng,B+"?dates="+rng+"&limit=100",B];
+ for(var k=0;k<tries.length;k++){try{return await sbGet(tries[k])}catch(e){err=e}}
+ var out=[],seen={},f8=function(d){return d.toISOString().slice(0,10).replace(/-/g,"")},days=[];
+ for(var n=0;n<8;n++)days.push(f8(new Date(Date.now()+n*864e5)));
+ await Promise.all(days.map(async function(d){try{(await sbGet(B+"?dates="+d)).forEach(function(e){if(!seen[e.id]){seen[e.id]=1;out.push(e)}})}catch(e){}}));
+ if(out.length)return out;throw err}
 async function loadESPN(){
  var c=cg("md_es2",216e5);if(c){ST=c.T;L=c.L;X=c.X;return}
  var T={},lg={},fx=[],res={},f8=function(d){return d.toISOString().slice(0,10).replace(/-/g,"")},rng=f8(new Date())+"-"+f8(new Date(Date.now()+10*864e5)),ids=[];
@@ -48,8 +57,8 @@ async function loadESPN(){
    gr.forEach(function(g){((g.standings&&g.standings.entries)||[]).forEach(function(e){var gf=stat(e,"pointsFor"),ga=stat(e,"pointsAgainst");if(isNaN(gf)){gf=stat(e,"goalsFor");ga=stat(e,"goalsAgainst")}
     rows.push({n:e.team.displayName,logo:e.team.logos&&e.team.logos[0]?e.team.logos[0].href:"",gp:stat(e,"gamesPlayed"),gf:gf,ga:ga})})})
   }catch(e){msgs.push("ESPN таблиця ("+LG[i][0]+"): "+ferr(e))}
-  try{var r2=await fetch("https://site.api.espn.com/apis/site/v2/sports/soccer/"+s+"/scoreboard?dates="+rng+"&limit=300");if(!r2.ok)throw new Error("HTTP "+r2.status);
-   ((await r2.json()).events||[]).forEach(function(e){var c=e.competitions&&e.competitions[0];if(!c||(e.status&&e.status.type&&e.status.type.state==="post"))return;
+  try{var ev=await sb(s,rng);
+   ev.forEach(function(e){var c=e.competitions&&e.competitions[0];if(!c||(e.status&&e.status.type&&e.status.type.state==="post"))return;
     var h=c.competitors.filter(function(x){return x.homeAway==="home"})[0],a=c.competitors.filter(function(x){return x.homeAway==="away"})[0];if(!h||!a)return;
     fx.push({lg:i,t:e.date,H:h.team.displayName,A:a.team.displayName});
     if(h.team.logo)lg[nm(h.team.displayName)]=h.team.logo;if(a.team.logo)lg[nm(a.team.displayName)]=a.team.logo})
