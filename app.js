@@ -453,7 +453,7 @@ function calBox(){var n=calCount(),c=S.cal,msg="";
  '<div>Поточні базові ваги: ринок '+wsh("mk")+", статистика "+wsh("st")+", API-Football "+wsh("af")+", Ело "+wsh("el")+".</div>"+(msg?"<div>"+msg+"</div>":"")+
  '<div class="acts"><button class="btn gold" id="cb"'+(n<100?" disabled":"")+'>Підібрати ваги</button><button class="btn" id="cr">Стандартні ваги</button></div></div>'}
 function applyW(w,c){S.w=Object.assign({},w);S.cal=c;sv();D.forEach(recalc);list()}
-var VER="v11 · 02.11.2026";
+var VER="v12 · 02.11.2026";
 function settings(){cur=null;
  $("gv").innerHTML='<h3 style="margin-top:6px">Стан даних</h3><div class="box"><div>'+(info||"Дані ще не завантажено.")+"</div>"+(msgs.length?'<div class="err">'+msgs.map(esc).join("<br>")+"</div>":"<div>Помилок немає.</div>")+'<div><button class="btn" id="rf2">Оновити дані</button></div></div>'+
  '<h3>Ключі API</h3><div class="box">'+
@@ -463,9 +463,10 @@ function settings(){cur=null;
  '<h3>Турніри (кожен витрачає кредит Odds API)</h3><div class="box">'+LG.map(function(l,i){return'<label class="ck"><input type="checkbox" id="lg'+i+'"'+(S.on[i]?" checked":"")+">"+l[0]+"</label>"}).join("")+"</div>"+
  '<p style="margin-top:18px"><button class="btn gold" id="sv">Зберегти й оновити</button></p>'+
  '<h3>Як складається прогноз</h3><div class="box"><div><b>Ринок (базова вага '+wsh("mk")+')</b>: коефіцієнти букмекерів без маржі.</div><div><b>Статистика й форма ('+wsh("st")+', для матчів між різними лігами в 2,5 раза менше)</b>: голи сезону плюс форма за 8 тижнів, де свіжіші матчі важать більше. Модель Пуассона з поправкою Діксона-Коулса для низьких рахунків і окремою перевагою господарів для кожного турніру.</div><div><b>API-Football ('+wsh("af")+')</b>: прогноз сервісу; відсутні гравці змінюють очікувані голи залежно від значущості й позиції.</div><div><b>Рейтинг Ело ('+wsh("el")+', для єврокубків у 2,5 раза більше)</b>: рахується в застосунку за матчами ESPN, стартові значення беруться з різниці м’ячів сезону.</div><div>Результат: найімовірніший рахунок, а також тотали та «обидві заб’ють».</div></div>'+calBox()+
- '<p class="note">Ключі: <a href="https://the-odds-api.com" target="_blank" rel="noopener">the-odds-api.com</a>, <a href="https://dashboard.api-football.com/register" target="_blank" rel="noopener">api-football.com</a>. Є безкоштовні плани.</p>'+'<p class="note">Версія застосунку: <b>'+VER+"</b></p>";
+ '<p class="note">Ключі: <a href="https://the-odds-api.com" target="_blank" rel="noopener">the-odds-api.com</a>, <a href="https://dashboard.api-football.com/register" target="_blank" rel="noopener">api-football.com</a>. Є безкоштовні плани.</p>'+'<h3>Застосунок</h3><div class="box"><div>Версія: <b>'+VER+'</b></div><div><button class="btn" id="ua">Оновити застосунок</button></div><div>Завантажує свіжі файли застосунку з сайту. Ключі, історія прогнозів і обрані матчі збережуться.</div></div>';
  $("cb").onclick=function(){var r=calib();if(!r)return;applyW(r.ok?r.w:DW,{n:r.n,l0:r.l0,l1:r.l1,ok:r.ok});settings()};
  $("cr").onclick=function(){applyW(DW,null);settings()};
+ $("ua").onclick=async function(){this.disabled=true;this.textContent="Оновлюю…";try{await fetch(location.pathname,{cache:"reload"})}catch(e){}location.replace(location.pathname+"?u="+Date.now())};
  $("rf2").onclick=function(){var r=doRefresh();if(r)r.then(function(){if(V==="g")settings()})};
  $("sv").onclick=function(){S.k={o:$("ko").value.trim(),a:$("ka").value.trim()};S.on=LG.map(function(l,i){return $("lg"+i).checked?1:0});
   if(F>=0&&!S.on[F])F=-1;sv();try{localStorage.removeItem("md_es2");localStorage.removeItem("md_fm2");localStorage.removeItem("md_od")}catch(e){}setV("m");refresh(false)}}
