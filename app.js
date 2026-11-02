@@ -251,22 +251,58 @@ async function loadOdds(force){
  var res={m:out,rem:rem,errs:errs,ts:Date.now()};if(out.length)cs("md_od",res);return res}
 
 /* ---------- API-Football (за бажанням) ---------- */
+/* Відсутні гравці. Значущість: частка хвилин (для півзахисників і нападників ще й голи+асисти) відносно найбільш задіяного гравця команди, сезон, усі турніри; кеш 12 год.
+   Нападники й півзахисники знижують голи своєї команди, воротар і захисники підвищують голи суперника. Якщо є коефіцієнти, поправка зменшується на частку ринку в прогнозі (ринок уже враховує травми). */
+var IK=.04,IC=.75,IU=1.25,DI=.6,KA={A:1,M:.7,D:.3,G:0},KD={G:1.25,D:1,M:.4,A:.1},PN={G:"воротар",D:"захисник",M:"півзахисник",A:"нападник"};
+function kA(p){return KA[p]!==undefined?KA[p]:.6}
+function kD(p){return KD[p]!==undefined?KD[p]:.4}
+function injK(m){return Math.max(.25,1-(m.mks||0))}
+function injA(m,s){var a=m.af;return a&&a.at?Math.max(IC,1-IK*injK(m)*a.at[s]):1}
+function injD(m,s){var a=m.af;return a&&a.de?Math.min(IU,1+IK*injK(m)*a.de[s]):1}
+async function teamImp(tid,y,H,B){
+ var k="md_pl2_"+tid+"_"+y,c=cg(k,432e5);if(c)return c;
+ var P=[],pg=1,tot=1;
+ while(pg<=tot&&pg<=4){
+  var r=await(await fetch(B+"players?team="+tid+"&season="+y+"&page="+pg,H)).json();
+  var er=r.errors&&Object.values(r.errors)[0];if(er)throw new Error(er);
+  tot=r.paging&&r.paging.total||1;
+  (r.response||[]).forEach(function(x){var mn=0,ga=0,ps="";
+   (x.statistics||[]).forEach(function(z){if(z.team&&z.team.id!==tid)return;mn+=z.games&&z.games.minutes||0;ga+=(z.goals&&z.goals.total||0)+(z.goals&&z.goals.assists||0);ps=ps||z.games&&z.games.position||""});
+   P.push([x.player.id,mn,ga,ps.charAt(0)])});
+  pg++}
+ if(!P.length)throw new Error("немає статистики гравців");
+ var mx=1,gx=1,o={};P.forEach(function(p){if(p[1]>mx)mx=p[1];if(p[2]>gx)gx=p[2]});
+ P.forEach(function(p){var a=Math.min(1,p[1]/mx),b=Math.min(1,p[2]/gx);o[p[0]]=[Math.round((p[3]==="G"||p[3]==="D"?a:.7*a+.3*b)*100)/100,p[3]]});
+ cs(k,o);return o}
+function injRs(z){var r=z.r||"";if(/suspen|red card|yellow card/i.test(r))return"дискваліфікація";return z.q?"під питанням"+(r?" ("+esc(r)+")":""):(r?esc(r):"відсутній")}
+function injLb(z){return z.i===null?"значущість невідома":(z.i>=.7?"ключовий":z.i>=.4?"основний":"запасний")+" ("+Math.round(z.i*100)+"%)"}
+function injH(m,a){var h=a.adv?"Порада сервісу: <b>"+esc(a.adv)+"</b>":"",k=injK(m),f1=function(x){return(Math.round(x*10)/10).toString().replace(".",",")};
+ [0,1].forEach(function(s){var L=a.il.filter(function(z){return z.s===s}).sort(function(x,y){return y.w-x.w}),n=s?m.A:m.H,ea=Math.round((1-injA(m,s))*100),ed=Math.round((injD(m,s)-1)*100),t=[];
+  if(ea>0)t.push("власні голи <b>−"+ea+"%</b>");if(ed>0)t.push("голи суперника <b>+"+ed+"%</b>");
+  var cap=1-IK*k*a.at[s]<IC||1+IK*k*a.de[s]>IU;
+  h+='<div style="margin-top:8px"><b>'+esc(n)+"</b>: "+(L.length?(t.length?"очікувані голи: "+t.join(", ")+(cap?" (досягнуто ліміт)":""):"суттєвого впливу на голи немає")+"<br>"+L.map(function(z){var pa=IK*k*z.a*100,pd=IK*k*z.d*100,q=[];if(pa>=.05)q.push("власні голи −"+f1(pa)+"%");if(pd>=.05)q.push("голи суперника +"+f1(pd)+"%");return esc(z.n)+" — "+injRs(z)+", "+(PN[z.p]||"позиція невідома")+", "+injLb(z)+(q.length?": "+q.join(", "):"")}).join("<br>"):"відсутніх гравців API-Football не повідомляє")+"</div>"});
+ h+="<div><small>"+(m.mks>0?"Коефіцієнти букмекерів уже враховують травми (частка ринку в прогнозі "+Math.round(m.mks*100)+"%), тому поправку зменшено до "+Math.round(k*100)+"% від повної.":"Коефіцієнтів немає, тому поправка за травми діє повністю.")+"</small></div>";
+ if(a.pe)h+="<div><small>Значущість гравців завантажити не вдалося ("+esc(a.pe)+"), тому для відсутніх узято середню.</small></div>";
+ else if(a.il.length)h+="<div><small>Значущість — частка хвилин порівняно з найбільш задіяним гравцем команди за сезон (для півзахисників і нападників ще й голи та асисти). Нападники й півзахисники знижують голи своєї команди, воротар і захисники підвищують голи суперника. Не більше −25% і +25% на команду.</small></div>";
+ return h}
 async function loadAF(m){
  if(!S.k.a||m.af!==undefined)return;
- var c=cg("md_af"+m.id,216e5);if(c){m.af=c;return}
+ var c=cg("md_af3"+m.id,216e5);if(c){m.af=c;return}
  m.af=null;m.afs="Завантажую аналіз API-Football…";
  try{var H={headers:{"x-apisports-key":S.k.a}},B="https://v3.football.api-sports.io/",d=m.t.toISOString().slice(0,10),y=m.t.getUTCFullYear()-(m.t.getUTCMonth()<6?1:0);
   var r=await(await fetch(B+"fixtures?league="+LG[m.lg][4]+"&season="+y+"&date="+d,H)).json();
   var er=r.errors&&Object.values(r.errors)[0];if(er)throw new Error(er);
   var f=(r.response||[]).filter(function(x){return same(x.teams.home.name,m.H)&&same(x.teams.away.name,m.A)})[0];
   if(!f)throw new Error("матч не знайдено в API-Football");
-  var id=f.fixture.id,hid=f.teams.home.id;
+  var id=f.fixture.id,hid=f.teams.home.id,aid=f.teams.away.id;
   var rs=await Promise.all([fetch(B+"predictions?fixture="+id,H).then(function(x){return x.json()}),fetch(B+"injuries?fixture="+id,H).then(function(x){return x.json()})]);
-  var pr=rs[0].response&&rs[0].response[0],inj=rs[1].response||[],o={inj:[0,0],names:[[],[]],p:null,adv:""};
+  var pr=rs[0].response&&rs[0].response[0],inj=rs[1].response||[],o={at:[0,0],de:[0,0],il:[],pe:"",p:null,adv:""},seen={},IM=[null,null];
   if(pr){var pc=pr.predictions.percent,v=[parseFloat(pc.home),parseFloat(pc.draw),parseFloat(pc.away)];
    if(v.every(function(x){return x>=0}))o.p=v.map(function(x){return x/(v[0]+v[1]+v[2])});o.adv=pr.predictions.advice||""}
-  inj.forEach(function(x){var s=x.team.id===hid?0:1;o.inj[s]+=x.player.type==="Questionable"?.5:1;if(o.names[s].length<4)o.names[s].push(x.player.name)});
-  m.af=o;m.afs="";cs("md_af"+m.id,o)
+  inj.forEach(function(x){if(!x.player||seen[x.player.id])return;seen[x.player.id]=1;o.il.push({id:x.player.id,n:x.player.name,s:x.team.id===hid?0:1,q:x.player.type==="Questionable"?1:0,r:x.player.reason||""})});
+  for(var s=0;s<2;s++){if(!o.il.some(function(z){return z.s===s}))continue;try{IM[s]=await teamImp(s?aid:hid,y,H,B)}catch(e){o.pe=ferr(e)}}
+  o.il.forEach(function(z){var im=IM[z.s]?IM[z.s][z.id]:undefined;z.i=im?im[0]:(IM[z.s]?.1:null);z.p=im?im[1]:"";z.w=(z.i===null?DI:z.i)*(z.q?.5:1);z.a=z.w*kA(z.p);z.d=z.w*kD(z.p);o.at[z.s]+=z.a;o.de[z.s]+=z.d});
+  m.af=o;m.afs="";cs("md_af3"+m.id,o)
  }catch(e){m.af=null;m.afs="API-Football: "+ferr(e)}}
 
 /* ---------- модель ---------- */
@@ -278,9 +314,19 @@ function recalc(m){var sg=[];m.dv=null;
  if(m.af&&m.af.p)sg.push(["API-Football",m.af.p,w.af,"af"]);
  if(m.el)sg.push(["Рейтинг Ело",m.el,w.el*(m.mx?MXE:1),"el"]);
  var tw=0,f=[0,0,0];sg=sg.filter(function(s){return s[2]>0});sg.forEach(function(s){tw+=s[2];for(var i=0;i<3;i++)f[i]+=s[1][i]*s[2]});
- f=f.map(function(x){return x/tw});m.sg=sg;m.tw=tw;m.fin=f;var l=fit(f);m.l0=l[0];m.l1=l[1]}
-function view(m,x,y){var f=m.af&&m.af.inj||[0,0],lh=m.l0*(1+.07*x)*Math.max(.8,1-.03*f[0]),la=m.l1*(1+.07*y)*Math.max(.8,1-.03*f[1]),r=calc(lh,la,true);return{r:r,k:pick(r,m.H,m.A),lh:lh,la:la}}
+ f=f.map(function(x){return x/tw});var mr=sg.filter(function(z){return z[3]==="mk"})[0];m.mks=mr?mr[2]/tw:0;m.sg=sg;m.tw=tw;m.fin=f;var l=fit(f);m.l0=l[0];m.l1=l[1]}
+function view(m,x,y){var lh=m.l0*(1+.07*x)*injA(m,0)*injD(m,1),la=m.l1*(1+.07*y)*injA(m,1)*injD(m,0),r=calc(lh,la,true);return{r:r,k:pick(r,m.H,m.A),lh:lh,la:la}}
 
+/* травми автоматично лише для обраних ★ матчів, що починаються протягом 48 годин (економія запитів API-Football); зупинка після двох невдач поспіль */
+var AFQ=false;
+async function favAF(){
+ if(!S.k.a||AFQ)return;AFQ=true;var ok=0,bad=0;
+ try{
+  var now=Date.now(),Z=D.filter(function(m){var t=m.t.getTime();return FV[fk(m)]&&t>now&&t<now+48*36e5&&m.af===undefined});
+  for(var i=0;i<Z.length&&bad<2;i++){var m=Z[i];await loadAF(m);if(m.af){ok++;bad=0;recalc(m);if(cur===m)draw(false)}else bad++}
+  if(ok){list();record()}
+ }catch(e){}
+ AFQ=false}
 async function refresh(force){
  $("bar").textContent="Оновлюю дані…";msgs=[];
  try{
@@ -296,13 +342,13 @@ async function refresh(force){
     if(a&&b){var fa=find(FM,m.H),fb=find(FM,m.A),ea=ef(a,fa),eb=ef(b,fb),ha=hal(m.lg),r=calc(a.g*ea[0]*eb[1]*ha[0],b.g*eb[0]*ea[1]*ha[1]);m.mx=a.c!==b.c;m.st={p:[r.h,r.d,r.a],x:[a,b]};m.fm=[fa&&fa.k>=2?fa:null,fb&&fb.k>=2?fb:null];
      var xa=find(EL,m.H),xb=find(EL,m.A);if(xa&&xb){m.ev=[Math.round(xa),Math.round(xb)];m.el=elo3(xa-xb+60)}}
     if(!m.mk&&!m.st)return null;
-    m.af=cg("md_af"+m.id,216e5)||undefined;recalc(m);return m})
+    m.af=cg("md_af3"+m.id,216e5)||undefined;recalc(m);return m})
    .filter(function(m){return m&&m.t.getTime()>lim}).sort(function(a,b){return a.t-b.t});
   info="Матчів: <b>"+D.length+"</b>"+(S.k.o?" · кредитів Odds API: <b>"+o.rem+"</b>":"")+" · команд зі статистикою: "+Object.keys(ST).length;
  }catch(e){D=[];info="";msgs.push(ferr(e))}
  if(!S.k.o)msgs.push("Додайте ключ The Odds API, щоб врахувати коефіцієнти (точніше).");
  $("bar").innerHTML=info+(msgs.length?' · <button class="lnk" id="wn">⚠ '+msgs.length+"</button>":"");
- tabs();list();record();
+ tabs();list();record();favAF();
  resolveHS().then(function(n){if(V==="s")stats()}).catch(function(){})}
 
 /* ---------- інтерфейс ---------- */
@@ -360,12 +406,12 @@ function draw(anim){var m=cur;if(!m)return;var a=m.af,e0=hfind(m),up=e0&&m.t.get
   fmh='<h3>Форма: останні матчі</h3><div class="box">'+fl(m.H,m.fm[0])+fl(m.A,m.fm[1])+'<div>П — перемога, Н — нічия, Пр — поразка (від старіших до новіших). Форма враховується в статистичній частині з вагою 35%: свіжіші матчі важать більше (вага зменшується вдвічі кожні 3 тижні).</div></div>'}
  var rows=m.sg.map(function(s){return'<div class="row"><b>'+s[0]+"</b><span>"+pc(s[2]/m.tw)+"%</span><span>"+s[1].map(function(x){return pc(x)}).join(" / ")+"</span></div>"}).join("");
  var st=m.st?"Голів за гру (забиті/пропущені): "+esc(m.H)+" "+(m.st.x[0].gf/m.st.x[0].gp).toFixed(2)+"/"+(m.st.x[0].ga/m.st.x[0].gp).toFixed(2)+", "+esc(m.A)+" "+(m.st.x[1].gf/m.st.x[1].gp).toFixed(2)+"/"+(m.st.x[1].ga/m.st.x[1].gp).toFixed(2):"Статистику не знайдено для однієї з команд.";
- var af=!S.k.a?"Додайте ключ API-Football, щоб бачити прогноз сервісу й травми.":a?(a.adv?"Порада сервісу: <b>"+esc(a.adv)+"</b><br>":"")+"Травми: "+esc(m.H)+" — "+(a.inj[0]?a.names[0].map(esc).join(", "):"немає даних")+"; "+esc(m.A)+" — "+(a.inj[1]?a.names[1].map(esc).join(", "):"немає даних"):esc(m.afs||"Завантаження…");
+ var af=!S.k.a?"Додайте ключ API-Football, щоб бачити прогноз сервісу й травми.":a?injH(m,a):esc(m.afs||"Завантаження…");
  sheet('<button class="btn" id="cl">Закрити</button><div class="meta" style="--c:'+LG[m.lg][1]+'"><i>'+li(m.lg)+LG[m.lg][0]+"</i> · "+dlabel(m.t)[0]+", "+hm(m.t)+"</div>"+
  '<div class="vs"><div class="t">'+bd(m.H)+"<span>"+esc(m.H)+'</span></div><div class="t">'+bd(m.A)+"<span>"+esc(m.A)+"</span></div></div><div id=\"dyn\"></div>"+
  '<h3>З яких джерел зібрано прогноз</h3><div class="box">'+rows+"<div>"+st+(m.ev?"<br>Рейтинг Ело: "+esc(m.H)+" "+m.ev[0]+", "+esc(m.A)+" "+m.ev[1]:"")+"</div><div>"+af+"</div></div>"+
  dvh+fmh+up+xb+'<h3>Ваші поправки до складу</h3><div class="box"><label>'+esc(m.H)+": <b id=\"la\">"+sl(ah)+'</b><input type="range" id="sa" min="-2" max="2" value="'+ah+'"></label><label>'+esc(m.A)+": <b id=\"lb\">"+sl(aa)+'</b><input type="range" id="sb" min="-2" max="2" value="'+aa+'"></label></div>'+
- '<p class="note">Ймовірності джерел: перемога господарів / нічия / перемога гостей. Модель Пуассона перетворює підсумок на очікувані голи, рахунок і тотали. Кожен «втрачений» гравець з API-Football знижує очікувані голи на 3%, повзунок змінює їх на 7% за крок.</p>');
+ '<p class="note">Ймовірності джерел: перемога господарів / нічия / перемога гостей. Модель Пуассона перетворює підсумок на очікувані голи, рахунок і тотали. Відсутні гравці з API-Football змінюють очікувані голи залежно від значущості й позиції: нападники та півзахисники знижують голи своєї команди, воротар і захисники підвищують голи суперника (до 4% за гравця, на команду не більше −25% і +25%). Якщо є коефіцієнти, поправка зменшується, бо ринок уже враховує травми. Повзунок змінює голи на 7% за крок.</p>');
  upd(anim)}
 function samp(r){var u=Math.random(),s=0,i;for(i=0;i<r.g.length;i++){s+=r.g[i][0];if(u<=s)return r.g[i]}return r.g[0]}
 $("det").onclick=function(e){var t=e.target,m=cur;if(t.closest("#cl")){close();return}if(!m)return;
@@ -415,7 +461,7 @@ function settings(){cur=null;
  "<div>Розклад, таблиці, форма й логотипи беруться з ESPN без ключа. Ключі зберігаються лише в цьому браузері.</div></div>"+
  '<h3>Турніри (кожен витрачає кредит Odds API)</h3><div class="box">'+LG.map(function(l,i){return'<label class="ck"><input type="checkbox" id="lg'+i+'"'+(S.on[i]?" checked":"")+">"+l[0]+"</label>"}).join("")+"</div>"+
  '<p style="margin-top:18px"><button class="btn gold" id="sv">Зберегти й оновити</button></p>'+
- '<h3>Як складається прогноз</h3><div class="box"><div><b>Ринок (базова вага '+wsh("mk")+')</b>: коефіцієнти букмекерів без маржі.</div><div><b>Статистика й форма ('+wsh("st")+', для матчів між різними лігами в 2,5 раза менше)</b>: голи сезону плюс форма за 8 тижнів, де свіжіші матчі важать більше. Модель Пуассона з поправкою Діксона-Коулса для низьких рахунків і окремою перевагою господарів для кожного турніру.</div><div><b>API-Football ('+wsh("af")+')</b>: прогноз сервісу, травми знижують очікувані голи.</div><div><b>Рейтинг Ело ('+wsh("el")+', для єврокубків у 2,5 раза більше)</b>: рахується в застосунку за матчами ESPN, стартові значення беруться з різниці м’ячів сезону.</div><div>Результат: найімовірніший рахунок, а також тотали та «обидві заб’ють».</div></div>'+calBox()+
+ '<h3>Як складається прогноз</h3><div class="box"><div><b>Ринок (базова вага '+wsh("mk")+')</b>: коефіцієнти букмекерів без маржі.</div><div><b>Статистика й форма ('+wsh("st")+', для матчів між різними лігами в 2,5 раза менше)</b>: голи сезону плюс форма за 8 тижнів, де свіжіші матчі важать більше. Модель Пуассона з поправкою Діксона-Коулса для низьких рахунків і окремою перевагою господарів для кожного турніру.</div><div><b>API-Football ('+wsh("af")+')</b>: прогноз сервісу; відсутні гравці змінюють очікувані голи залежно від значущості й позиції.</div><div><b>Рейтинг Ело ('+wsh("el")+', для єврокубків у 2,5 раза більше)</b>: рахується в застосунку за матчами ESPN, стартові значення беруться з різниці м’ячів сезону.</div><div>Результат: найімовірніший рахунок, а також тотали та «обидві заб’ють».</div></div>'+calBox()+
  '<p class="note">Ключі: <a href="https://the-odds-api.com" target="_blank" rel="noopener">the-odds-api.com</a>, <a href="https://dashboard.api-football.com/register" target="_blank" rel="noopener">api-football.com</a>. Є безкоштовні плани.</p>';
  $("cb").onclick=function(){var r=calib();if(!r)return;applyW(r.ok?r.w:DW,{n:r.n,l0:r.l0,l1:r.l1,ok:r.ok});settings()};
  $("cr").onclick=function(){applyW(DW,null);settings()};
@@ -425,7 +471,7 @@ function settings(){cur=null;
 
 $("tabs").onclick=function(e){var b=e.target.closest(".tab");if(!b)return;F=+b.dataset.f;tabs();list()};
 $("list").onclick=function(e){if(e.target.closest("#favcal")){icsDl(D.filter(function(x){return FV[fk(x)]&&x.t.getTime()>Date.now()}));return}var s=e.target.closest(".st");
- if(s){var k=s.dataset.k;if(FV[k])delete FV[k];else FV[k]=1;try{localStorage.setItem("md_fv",JSON.stringify(FV))}catch(x){}if(V==="f")list();else s.setAttribute("aria-pressed",!!FV[k]);return}
+ if(s){var k=s.dataset.k;if(FV[k])delete FV[k];else{FV[k]=1;favAF()}try{localStorage.setItem("md_fv",JSON.stringify(FV))}catch(x){}if(V==="f")list();else s.setAttribute("aria-pressed",!!FV[k]);return}
  var b=e.target.closest(".m");if(b)open(+b.dataset.i)};
 $("list").onkeydown=function(e){if((e.key==="Enter"||e.key===" ")&&e.target.classList.contains("m")){e.preventDefault();open(+e.target.dataset.i)}};
 $("q").oninput=function(){Q=this.value;list()};
