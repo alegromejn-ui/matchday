@@ -281,6 +281,7 @@ function injH(m,a){var h=a.adv?"Порада сервісу: <b>"+esc(a.adv)+"</
   if(ea>0)t.push("власні голи <b>−"+ea+"%</b>");if(ed>0)t.push("голи суперника <b>+"+ed+"%</b>");
   var cap=1-IK*k*a.at[s]<IC||1+IK*k*a.de[s]>IU;
   h+='<div style="margin-top:8px"><b>'+esc(n)+"</b>: "+(L.length?(t.length?"очікувані голи: "+t.join(", ")+(cap?" (досягнуто ліміт)":""):"суттєвого впливу на голи немає")+"<br>"+L.map(function(z){var pa=IK*k*z.a*100,pd=IK*k*z.d*100,q=[];if(pa>=.05)q.push("власні голи −"+f1(pa)+"%");if(pd>=.05)q.push("голи суперника +"+f1(pd)+"%");return esc(z.n)+" — "+injRs(z)+", "+(PN[z.p]||"позиція невідома")+", "+injLb(z)+(q.length?": "+q.join(", "):"")}).join("<br>"):"відсутніх гравців API-Football не повідомляє")+"</div>"});
+ if(!a.il.length)h+="<div><small>API-Football не повернув жодного запису про травми чи дискваліфікації для цього матчу. Такі дані є не для всіх матчів і турнірів і часто з’являються лише ближче до гри, тому перевірте картку пізніше.</small></div>";
  h+="<div><small>"+(m.mks>0?"Коефіцієнти букмекерів уже враховують травми (частка ринку в прогнозі "+Math.round(m.mks*100)+"%), тому поправку зменшено до "+Math.round(k*100)+"% від повної.":"Коефіцієнтів немає, тому поправка за травми діє повністю.")+"</small></div>";
  if(a.pe)h+="<div><small>Значущість гравців завантажити не вдалося ("+esc(a.pe)+"), тому для відсутніх узято середню.</small></div>";
  else if(a.il.length)h+="<div><small>Значущість — частка хвилин порівняно з найбільш задіяним гравцем команди за сезон (для півзахисників і нападників ще й голи та асисти). Нападники й півзахисники знижують голи своєї команди, воротар і захисники підвищують голи суперника. Не більше −25% і +25% на команду.</small></div>";
@@ -296,7 +297,7 @@ async function loadAF(m){
   if(!f)throw new Error("матч не знайдено в API-Football");
   var id=f.fixture.id,hid=f.teams.home.id,aid=f.teams.away.id;
   var rs=await Promise.all([fetch(B+"predictions?fixture="+id,H).then(function(x){return x.json()}),fetch(B+"injuries?fixture="+id,H).then(function(x){return x.json()})]);
-  var pr=rs[0].response&&rs[0].response[0],inj=rs[1].response||[],o={at:[0,0],de:[0,0],il:[],pe:"",p:null,adv:""},seen={},IM=[null,null];
+  var pr=rs[0].response&&rs[0].response[0],inj=rs[1].response||[],o={at:[0,0],de:[0,0],il:[],pe:"",p:null,adv:"",n:inj.length},seen={},IM=[null,null];
   if(pr){var pc=pr.predictions.percent,v=[parseFloat(pc.home),parseFloat(pc.draw),parseFloat(pc.away)];
    if(v.every(function(x){return x>=0}))o.p=v.map(function(x){return x/(v[0]+v[1]+v[2])});o.adv=pr.predictions.advice||""}
   inj.forEach(function(x){if(!x.player||seen[x.player.id])return;seen[x.player.id]=1;o.il.push({id:x.player.id,n:x.player.name,s:x.team.id===hid?0:1,q:x.player.type==="Questionable"?1:0,r:x.player.reason||""})});
@@ -335,8 +336,14 @@ async function refresh(force){
   try{await loadForm()}catch(e){msgs.push("ESPN форма команд: "+ferr(e))}
   var o={m:[],rem:"—",errs:[]};
   if(S.k.o){try{o=await loadOdds(force);msgs=msgs.concat(o.errs)}catch(e){msgs.push("The Odds API: "+ferr(e))}}
-  var all=o.m.slice(),lim=Date.now()-72e5;
-  X.forEach(function(f){if(!all.some(function(m){return m.lg===f.lg&&same(m.H,f.H)&&same(m.A,f.A)}))all.push({id:"e"+f.lg+nm(f.H)+f.t.slice(0,10),lg:f.lg,t:f.t,H:f.H,A:f.A,mk:null})});
+  var all=o.m.slice(),lim=Date.now()-72e5,dup=0,xs={},dt=function(a,b){return Math.abs(new Date(a)-new Date(b))},sm=function(g,f){return g.lg===f.lg&&same(g.H,f.H)&&same(g.A,f.A)};
+  var XU=X.filter(function(f){var k=f.lg+"|"+nm(f.H)+"|"+nm(f.A)+"|"+f.t.slice(0,10);if(xs[k])return false;xs[k]=1;return true});
+  /* ESPN і Odds API інколи по-різному пишуть назви команд, тоді той самий матч з’являвся двічі. Зводимо за турніром, часом (до 4 год) і хоча б однією впізнаною командою: одна команда не грає два матчі одночасно */
+  var uo=o.m.filter(function(g){return!XU.some(function(f){return sm(g,f)})}),ue=XU.filter(function(f){return!o.m.some(function(g){return sm(g,f)})});
+  ue.forEach(function(f){var C=uo.filter(function(g){return!g.pr&&g.lg===f.lg&&dt(g.t,f.t)<4*36e5}),P=C.filter(function(g){return same(g.H,f.H)||same(g.A,f.A)}),
+   g=P.length===1?P[0]:!P.length&&C.length===1&&ue.filter(function(z){return z.lg===f.lg&&dt(z.t,f.t)<4*36e5}).length===1?C[0]:null;
+   if(g){g.pr=1;f.pr=1;dup++;all[all.indexOf(g)]=Object.assign({},g,{H:f.H,A:f.A})}});
+  XU.forEach(function(f){if(!f.pr&&!o.m.some(function(g){return sm(g,f)}))all.push({id:"e"+f.lg+nm(f.H)+f.t.slice(0,10),lg:f.lg,t:f.t,H:f.H,A:f.A,mk:null})});
   D=all.filter(function(g){return S.on[g.lg]}).map(function(g){var m={id:g.id,lg:g.lg,t:new Date(g.t),H:g.H,A:g.A,mk:g.mk};
     var a=find(ST,m.H),b=find(ST,m.A);
     if(a&&b){var fa=find(FM,m.H),fb=find(FM,m.A),ea=ef(a,fa),eb=ef(b,fb),ha=hal(m.lg),r=calc(a.g*ea[0]*eb[1]*ha[0],b.g*eb[0]*ea[1]*ha[1]);m.mx=a.c!==b.c;m.st={p:[r.h,r.d,r.a],x:[a,b]};m.fm=[fa&&fa.k>=2?fa:null,fb&&fb.k>=2?fb:null];
@@ -344,7 +351,7 @@ async function refresh(force){
     if(!m.mk&&!m.st)return null;
     m.af=cg("md_af3"+m.id,216e5)||undefined;recalc(m);return m})
    .filter(function(m){return m&&m.t.getTime()>lim}).sort(function(a,b){return a.t-b.t});
-  info="Матчів: <b>"+D.length+"</b>"+(S.k.o?" · кредитів Odds API: <b>"+o.rem+"</b>":"")+" · команд зі статистикою: "+Object.keys(ST).length;
+  info="Матчів: <b>"+D.length+"</b>"+(S.k.o?" · кредитів Odds API: <b>"+o.rem+"</b>":"")+" · команд зі статистикою: "+Object.keys(ST).length+(dup?" · об’єднано дублів: <b>"+dup+"</b>":"");
  }catch(e){D=[];info="";msgs.push(ferr(e))}
  if(!S.k.o)msgs.push("Додайте ключ The Odds API, щоб врахувати коефіцієнти (точніше).");
  $("bar").innerHTML=info+(msgs.length?' · <button class="lnk" id="wn">⚠ '+msgs.length+"</button>":"");
@@ -372,7 +379,7 @@ function list(){var FF=V==="f"?-2:F,q=FF===-2?"":Q.trim().toLowerCase(),L2=D.fil
  if(!L2.length){$("list").innerHTML='<p class="empty">'+(FF===-2?"Позначте матчі зірочкою ★, і вони з’являться тут.":FF===-3?"Зараз немає матчів, де статистика розходиться з ринком більш ніж на 10 п.п. Для цієї вкладки потрібен ключ The Odds API.":q?"Нічого не знайдено.":"Матчів не знайдено. Спробуйте «Оновити» або перевірте повідомлення про помилки в розділі «Ще».")+"</p>";return}
  var h="";
  if(SO==="t"){var cd="";L2.forEach(function(x){var k=x.t.toDateString();if(k!==cd){cd=k;var d=dlabel(x.t);h+='<div class="day">'+d[0]+(d[1]?"<span>"+d[1]+"</span>":"")+"</div>"}h+=card(x)})}
- else{L2.slice().sort(function(a,b){return SO==="c"?b.v.k.p-a.v.k.p:(b.v.lh+b.v.la)-(a.v.lh+a.v.la)}).forEach(function(x){h+=card(x)})}
+ else{h+='<div class="note" style="margin:6px 2px 10px">'+(SO==="c"?"Сортування за впевненістю: зверху матчі, де ймовірність прогнозованого результату (1, X чи 2) найвища.":"Сортування за голами: зверху матчі, де модель очікує найбільше голів (сума для обох команд).")+"</div>";L2.slice().sort(function(a,b){return SO==="c"?b.v.k.p-a.v.k.p:(b.v.lh+b.v.la)-(a.v.lh+a.v.la)}).forEach(function(x){h+=card(x)})}
  if(FF===-2){var up2=L2.filter(function(x){return x.t.getTime()>Date.now()}).length;if(up2)h='<div class="acts" style="margin:8px 2px"><button class="btn gold" id="favcal">Нагадування в календар ('+up2+")</button></div>"+h}
  $("list").innerHTML=h}
 function sheet(h){$("det").innerHTML=h;$("sh").classList.add("on");$("sh").scrollTop=0}
@@ -453,7 +460,7 @@ function calBox(){var n=calCount(),c=S.cal,msg="";
  '<div>Поточні базові ваги: ринок '+wsh("mk")+", статистика "+wsh("st")+", API-Football "+wsh("af")+", Ело "+wsh("el")+".</div>"+(msg?"<div>"+msg+"</div>":"")+
  '<div class="acts"><button class="btn gold" id="cb"'+(n<100?" disabled":"")+'>Підібрати ваги</button><button class="btn" id="cr">Стандартні ваги</button></div></div>'}
 function applyW(w,c){S.w=Object.assign({},w);S.cal=c;sv();D.forEach(recalc);list()}
-var VER="v12 · 02.11.2026";
+var VER="v13 · 02.11.2026";
 function settings(){cur=null;
  $("gv").innerHTML='<h3 style="margin-top:6px">Стан даних</h3><div class="box"><div>'+(info||"Дані ще не завантажено.")+"</div>"+(msgs.length?'<div class="err">'+msgs.map(esc).join("<br>")+"</div>":"<div>Помилок немає.</div>")+'<div><button class="btn" id="rf2">Оновити дані</button></div></div>'+
  '<h3>Ключі API</h3><div class="box">'+
