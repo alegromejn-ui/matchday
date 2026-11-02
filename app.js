@@ -315,11 +315,32 @@ async function loadLU(m,force){
     u.w[s].sort(function(x,y){return y.i-x.i})}catch(e){u.pe=ferr(e)}}}
   m.lu=u;m.lus="";cs(k,u)
  }catch(e){m.lus="API-Football (склади): "+ferr(e)}}
+/* Орієнтовний склад: API-Football не дає прогнозів складів, тому беремо стартовий склад останнього завершеного матчу команди (будь-який турнір). Травмовані позначаються. Кеш 6 год на команду. */
+async function teamXI(tid,H,B){var k="md_xi"+tid,c=cg(k,216e5);if(c)return c;
+ var r=await(await fetch(B+"fixtures?team="+tid+"&last=1",H)).json(),er=r.errors&&Object.values(r.errors)[0];if(er)throw new Error(er);
+ var f=r.response&&r.response[0];if(!f)throw new Error("немає останнього матчу");
+ var l=await(await fetch(B+"fixtures/lineups?fixture="+f.fixture.id,H)).json();er=l.errors&&Object.values(l.errors)[0];if(er)throw new Error(er);
+ var e=(l.response||[]).filter(function(x){return x.team&&x.team.id===tid})[0];
+ if(!e||!(e.startXI||[]).length)throw new Error("склад останнього матчу відсутній");
+ var o={fo:e.formation||"",d:String(f.fixture.date).slice(0,10),op:(f.teams.home.id===tid?f.teams.away.name:f.teams.home.name),xi:e.startXI.map(function(z){return{id:z.player.id,n:z.player.name||"",p:z.player.pos||""}})};
+ cs(k,o);return o}
+async function loadPL(m){
+ if(!S.k.a)return;m.pls="Завантажую орієнтовний склад…";
+ try{var H={headers:{"x-apisports-key":S.k.a}},B="https://v3.football.api-sports.io/",a=m.af,fx=a&&a.hid?{hid:a.hid,aid:a.aid}:await afFx(m,H,B),pl=[];
+  for(var s=0;s<2;s++)pl.push(await teamXI(s?fx.aid:fx.hid,H,B));
+  m.pl=pl;m.pls=""}catch(e){m.pls="API-Football (орієнтовний склад): "+ferr(e)}}
+function plIn(m){if(m.pls)return"<div style=\"margin-top:6px\">"+esc(m.pls)+"</div>"+(/^Завантажую/.test(m.pls)?"":'<div><button class="btn" id="pl">Спробувати ще раз</button></div>');
+ if(!m.pl)return'<div style="margin-top:6px"><button class="btn" id="pl">Показати орієнтовний склад</button></div>';
+ var PO={G:"Воротар",D:"Захисники",M:"Півзахисники",F:"Нападники"},inj=(m.af&&m.af.il)||[];
+ return[0,1].map(function(s){var t=m.pl[s],n=s?m.A:m.H;
+  return'<div style="margin-top:8px"><b>'+esc(n)+"</b> · орієнтовно ("+(t.fo?"схема "+esc(t.fo)+", ":"")+"склад матчу проти "+esc(t.op)+", "+esc(t.d)+")"+
+   ["G","D","M","F"].map(function(g){var L=t.xi.filter(function(z){return z.p===g});return L.length?"<br><small>"+PO[g]+":</small> "+L.map(function(z){var o=inj.some(function(i){return i.s===s&&i.id===z.id});return o?"<s>"+esc(z.n)+"</s> (відсутній)":esc(z.n)}).join(", "):""}).join("")+"</div>"}).join("")+
+  "<div><small>Це не прогноз тренера, а склад останнього матчу команди: після ротації чи травм він зміниться. Перекреслені гравці відсутні за даними API-Football.</small></div>"}
 function luN(m){return m.lu&&m.lu.ok?m.lu.w[0].length+m.lu.w[1].length:0}
 function luIn(m){var u=m.lu,h="";
  if(m.lus)h+="<div>"+esc(m.lus)+"</div>";
- else if(!u)h+="<div>Склади ще не завантажено."+(luWin(m)?"":" Вони з’являються за 1–1,5 години до початку матчу.")+"</div>";
- else if(!u.ok)h+="<div>Склади ще не оголошено (оновлено о "+hm(new Date(u.ts))+"). Зазвичай вони з’являються за 1–1,5 години до початку.</div>";
+ else if(!u)h+="<div>Офіційні склади ще не завантажено."+(luWin(m)?"":" Вони з’являються за 1–1,5 години до початку матчу.")+"</div>"+plIn(m);
+ else if(!u.ok)h+="<div>Склади ще не оголошено (оновлено о "+hm(new Date(u.ts))+"). Зазвичай вони з’являються за 1–1,5 години до початку.</div>"+plIn(m);
  else{[0,1].forEach(function(s){var n=s?m.A:m.H,w=u.w[s];
    h+='<div style="margin-top:6px"><b>'+esc(n)+"</b>"+(u.fo[s]?" · схема "+esc(u.fo[s]):"")+": "+(u.pe?"значущість гравців не вдалося завантажити ("+esc(u.pe)+"), тому перевірити ключових не можна":w.length?'<span style="color:var(--bad,#ff6b6b)">⚠ не в стартовому складі</span><br>'+w.map(function(z){return esc(z.n)+" — "+(PN[z.p]||"позиція невідома")+", ключовий ("+Math.round(z.i*100)+"%), "+(z.b?"на лаві":"поза заявкою")}).join("<br>"):"усі ключові гравці в старті")+"</div>"});
   h+="<div><small>Оновлено о "+hm(new Date(u.ts))+". Ключовий гравець — значущість від 70%. На прогноз це не впливає, лише попередження: ринок на склади реагує сам.</small></div>"}
@@ -435,6 +456,7 @@ window.addEventListener("popstate",hide);
 function sl(v){return["без ключових гравців","є втрати","склад стандартний","сильний склад","повний комплект"][v+2]}
 async function open(i){try{history.pushState({d:1},"")}catch(e){}cur=D[i];ah=0;aa=0;draw(true);var m=cur;
  if(S.k.a&&m.af===undefined){await loadAF(m);recalc(m);if(cur===m)draw(false)}
+ if(S.k.a&&m.t.getTime()>Date.now()&&m.t.getTime()<Date.now()+48*36e5&&!m.pl&&!m.pls){await loadPL(m);if(cur===m&&$("lub"))$("lub").innerHTML=luIn(m)}
  if(S.k.a&&luWin(m)&&!luFresh(m.lu)){await loadLU(m);if(cur===m&&$("lub")){$("lub").innerHTML=luIn(m);list()}}}
 function upd(anim){var m=cur;if(!m)return;var v=view(m,ah,aa),r=v.r,k=v.k,an=anim?"":' style="animation:none"',tp=r.g.slice().sort(function(x,y){return y[0]-x[0]}).slice(0,4);m.vr=v;
  var mx=0,cells="",i,j;for(i=0;i<6;i++)for(j=0;j<6;j++)mx=Math.max(mx,r.g[i*N+j][0]);
@@ -476,6 +498,7 @@ $("det").onclick=function(e){var t=e.target,m=cur;if(t.closest("#cl")){close();r
  var ub=t.closest("[data-u]");if(ub){var e1=hfind(m),i=+ub.dataset.u;if(!e1||m.t.getTime()<=Date.now())return;if(e1.u===i)delete e1.u;else e1.u=i;hsv();Array.prototype.forEach.call(ub.parentNode.children,function(b){b.setAttribute("aria-pressed",+b.dataset.u===e1.u)});return}
  var hc=t.closest(".hc");if(hc){var c=m.vr.r.g[+hc.dataset.i*N+ +hc.dataset.j];$("hi").innerHTML="Рахунок <b>"+c[1]+":"+c[2]+"</b>: "+(c[0]*100).toFixed(1)+"% (приблизно 1 шанс із "+Math.round(1/c[0])+")";return}
  if(t.closest("#cal")){icsDl([m]);return}
+ if(t.closest("#pl")){loadPL(m).then(function(){if(cur===m&&$("lub"))$("lub").innerHTML=luIn(m)});$("lub").innerHTML=luIn(m);return}
  if(t.closest("#lu")){var lb=t.closest("#lu");lb.disabled=true;$("lub").innerHTML="Завантажую склади…";loadLU(m,true).then(function(){if(cur===m&&$("lub")){$("lub").innerHTML=luIn(m);list()}if(lb)lb.disabled=false});return}
  if(t.closest("#sim1")){var s=samp(m.vr.r);$("sr").innerHTML='Симуляція: <b class="disp roll">'+s[1]+":"+s[2]+"</b>";return}
  if(t.closest("#sim100")){var w=[0,0,0],gh=0,ga=0,k;for(k=0;k<100;k++){var z=samp(m.vr.r);w[z[1]>z[2]?0:z[1]===z[2]?1:2]++;gh+=z[1];ga+=z[2]}
@@ -509,7 +532,7 @@ function calBox(){var n=calCount(),c=S.cal,msg="";
  '<div>Поточні базові ваги: ринок '+wsh("mk")+", статистика "+wsh("st")+", API-Football "+wsh("af")+", Ело "+wsh("el")+".</div>"+(msg?"<div>"+msg+"</div>":"")+
  '<div class="acts"><button class="btn gold" id="cb"'+(n<100?" disabled":"")+'>Підібрати ваги</button><button class="btn" id="cr">Стандартні ваги</button></div></div>'}
 function applyW(w,c){S.w=Object.assign({},w);S.cal=c;sv();D.forEach(recalc);list()}
-var VER="v14 · 02.11.2026";
+var VER="v15 · 02.11.2026";
 function settings(){cur=null;
  $("gv").innerHTML='<h3 style="margin-top:6px">Стан даних</h3><div class="box"><div>'+(info||"Дані ще не завантажено.")+"</div>"+(msgs.length?'<div class="err">'+msgs.map(esc).join("<br>")+"</div>":"<div>Помилок немає.</div>")+'<div><button class="btn" id="rf2">Оновити дані</button></div></div>'+
  '<h3>Ключі API</h3><div class="box">'+
